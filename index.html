@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>YouTube Niche Analyzer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a control-room board. Sticky toolbar, then a grid of niche cards;
+   each card reads top to bottom as TubeLab gauges, audit scores, screenshots, report buttons. */
+:root {
+  --bg: #0e1116;
+  --surface: #161a22;
+  --surface-2: #1d2330;
+  --line: #2a3141;
+  --fg: #e8ebf2;
+  --muted: #8f98ab;
+  --accent: #8fb4ff;
+  --accent-ink: #0e1116;
+  --good: #3cc57a;
+  --warn: #f0a93a;
+  --bad: #f0525e;
+  --good-bg: rgba(60,197,122,.12);
+  --warn-bg: rgba(240,169,58,.13);
+  --bad-bg: rgba(240,82,94,.12);
+  --scrim: rgba(5,7,10,.88);
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f4f8; --surface: #ffffff; --surface-2: #eef1f6; --line: #d8dde7;
+    --fg: #161b25; --muted: #586276; --accent: #2f5fd0; --accent-ink: #ffffff;
+    --good: #1a9653; --warn: #b5700f; --bad: #cc3240;
+    --good-bg: rgba(26,150,83,.10); --warn-bg: rgba(181,112,15,.11); --bad-bg: rgba(204,50,64,.09);
+    --scrim: rgba(12,16,24,.82);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f2f4f8; --surface: #ffffff; --surface-2: #eef1f6; --line: #d8dde7;
+  --fg: #161b25; --muted: #586276; --accent: #2f5fd0; --accent-ink: #ffffff;
+  --good: #1a9653; --warn: #b5700f; --bad: #cc3240;
+  --good-bg: rgba(26,150,83,.10); --warn-bg: rgba(181,112,15,.11); --bad-bg: rgba(204,50,64,.09);
+  --scrim: rgba(12,16,24,.82);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+img { max-width: 100%; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15px/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+.wrap { max-width: 1240px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+/* Masthead */
+.mast { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; padding-block: 28px 18px; }
+.mast h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+.mast h1 span { color: var(--muted); font-weight: 600; }
+.mast p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.tally { display: flex; gap: 20px; }
+.tally div { display: grid; }
+.tally b { font: 600 22px/1.1 var(--font-data); font-variant-numeric: tabular-nums; }
+.tally small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+
+/* Toolbar */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding-block: 12px; background: var(--bg); border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.field { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; min-height: 40px; }
+.field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.field input, .field select { background: transparent; border: 0; outline: none; min-height: 38px; min-width: 0; }
+.field select option { background: var(--surface); color: var(--fg); }
+.field.search { flex: 1 1 220px; }
+.field.search input { width: 100%; }
+.field:focus-within { border-color: var(--accent); }
+
+/* Grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 18px; align-items: start; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 16px; padding: 18px; min-width: 0; }
+.card-head { display: grid; gap: 6px; }
+.card-head h2 { font-size: 21px; font-weight: 700; line-height: 1.2; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; letter-spacing: .02em; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--good); background: var(--good-bg); }
+.pill.warn { color: var(--warn); background: var(--warn-bg); }
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+.pill.test { color: var(--warn); border-style: dashed; }
+.testnote { font-size: 13px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; }
+
+.sec-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.sec { display: grid; gap: 10px; min-width: 0; }
+
+/* TubeLab gauges */
+.gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.gauge { display: grid; justify-items: center; gap: 4px; text-align: center; padding: 10px 4px 8px; background: var(--surface-2); border-radius: 10px; }
+.gauge svg { width: 68px; height: 68px; display: block; }
+.gauge .track { fill: none; stroke: var(--line); stroke-width: 6; }
+.gauge .val { fill: none; stroke-width: 6; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.gauge text { font: 600 20px var(--font-data); fill: currentColor; }
+.gauge.good { color: var(--good); } .gauge.good .val { stroke: var(--good); }
+.gauge.warn { color: var(--warn); } .gauge.warn .val { stroke: var(--warn); }
+.gauge.bad { color: var(--bad); } .gauge.bad .val { stroke: var(--bad); }
+.gauge.none { color: var(--muted); }
+.gauge b { font-size: 13px; font-weight: 600; color: var(--fg); }
+.gauge small { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.bands { display: flex; gap: 12px; font-size: 11px; color: var(--muted); }
+.bands i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.facts div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; min-width: 0; }
+.facts dt { color: var(--muted); font-size: 13px; }
+.facts dd { margin: 0; font: 600 13.5px var(--font-data); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Audit scores */
+.audit { display: grid; grid-template-columns: auto 1fr; gap: 14px 16px; align-items: center; }
+.big { display: grid; justify-items: start; }
+.big .score { font: 700 40px/1 var(--font-data); font-variant-numeric: tabular-nums; }
+.big small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.bars { display: grid; gap: 6px; min-width: 0; }
+.bar-row { display: grid; grid-template-columns: 9.5em 1fr 2.2em; gap: 8px; align-items: center; font-size: 13px; }
+.bar-row span:first-child { color: var(--muted); }
+.meter { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 3px; }
+.bar-row .num { text-align: right; font-size: 13px; }
+.sub-scores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mini { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.mini small { color: var(--muted); font-size: 12px; }
+.mini b { font: 600 20px var(--font-data); font-variant-numeric: tabular-nums; }
+.mini span { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.summary { margin: 0; font-size: 14px; color: var(--fg); max-width: 65ch; }
+
+/* Screenshots */
+.shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.shot { padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; aspect-ratio: 16 / 10; max-width: 100%; }
+.shot img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.shot:hover { border-color: var(--accent); }
+.noshots { font-size: 13px; color: var(--muted); }
+
+/* Report buttons */
+.reports { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rbtn { display: grid; justify-items: center; gap: 1px; text-align: center; text-decoration: none; padding: 10px 6px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.rbtn small { font-weight: 500; font-size: 11.5px; opacity: .8; }
+.rbtn:hover { filter: brightness(1.08); }
+.rbtn.off { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
+
+.card-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.ghost { background: none; border: 1px solid var(--line); border-radius: 7px; padding: 5px 10px; cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.ghost:hover { color: var(--fg); border-color: var(--muted); }
+.ghost.danger { color: var(--bad); border-color: var(--bad); }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--fg); }
+
+/* States */
+.state { border: 1px dashed var(--line); border-radius: 12px; padding: 32px 22px; display: grid; gap: 10px; max-width: 640px; }
+.state h2 { font-size: 20px; }
+.state p { margin: 0; color: var(--muted); }
+.state ol { margin: 0; padding-left: 1.2em; color: var(--muted); display: grid; gap: 4px; }
+
+/* Lightbox */
+.lb { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; grid-template-rows: auto 1fr auto; padding: calc(env(safe-area-inset-top, 0px) + 10px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
+.lb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #fff; }
+.lb-top span { font-size: 14px; }
+.lb-stage { display: grid; place-items: center; min-height: 0; overflow: auto; }
+.lb-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+.lb-nav { display: flex; justify-content: center; gap: 10px; }
+.lb button { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.lb button:hover { background: rgba(255,255,255,.2); }
+
+@media (max-width: 460px) {
+  .card { padding: 14px; }
+  .audit { grid-template-columns: 1fr; }
+  .bar-row { grid-template-columns: 8.5em 1fr 2.2em; }
+  .facts { grid-template-columns: 1fr; }
+  .gauge svg { width: 58px; height: 58px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gauge .val { transition: stroke-dasharray .5s ease; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <h1>YouTube Niche Analyzer <span>· Brian's niches</span></h1>
+      <p>Each card holds one niche: its TubeLab scores, the audit scores from your Niche, Channel and Bending reports, the screenshots, and the reports themselves.</p>
+    </div>
+    <div class="tally" id="tally" hidden>
+      <div><b id="t-count">0</b><small>Niches</small></div>
+      <div><b id="t-green">0</b><small>Green on all 3</small></div>
+    </div>
+  </header>
+
+  <div class="bar" role="search">
+    <div class="field search">
+      <label for="q">Search</label>
+      <input id="q" type="search" placeholder="Niche or channel name" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="sort">Sort</label>
+      <select id="sort">
+        <option value="added">Newest added</option>
+        <option value="opportunity">Opportunity score</option>
+        <option value="marketSize">Market Size</option>
+        <option value="unsaturated">Unsaturated</option>
+        <option value="profitable">Profitable</option>
+        <option value="rpm">RPM (top of range)</option>
+        <option value="channel">Channel potential</option>
+        <option value="bend">Best bend score</option>
+        <option value="name">Name A to Z</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="filter">Show</label>
+      <select id="filter">
+        <option value="all">All niches</option>
+        <option value="green3">Green on all 3 TubeLab scores</option>
+        <option value="profit71">Profitable 71+</option>
+        <option value="unsat71">Unsaturated 71+</option>
+        <option value="market71">Market Size 71+</option>
+        <option value="opp60">Opportunity 60+</option>
+        <option value="real">Hide test entries</option>
+      </select>
+    </div>
+  </div>
+
+  <main id="out" aria-live="polite">
+    <div class="state">
+      <h2>Loading your niches</h2>
+      <p>Your niche cards appear here as soon as the niche store answers.</p>
+    </div>
+  </main>
+</div>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+  <div class="lb-top"><span id="lb-cap"></span><button id="lb-close" type="button">Close</button></div>
+  <div class="lb-stage"><img id="lb-img" alt=""></div>
+  <div class="lb-nav"><button id="lb-prev" type="button">Previous</button><button id="lb-next" type="button">Next</button></div>
+</div>
+
+<script type="application/json" id="niche-data">
+[
+ {
+  "name": "TEST \u00b7 Cosmic \"What If\" Scenarios + Aussie Fortunes",
+  "isTest": true,
+  "testNote": "Example entry built from your sample files. The TubeLab scores and screenshots are from Cosmic \"What If\" Scenarios; the Niche, Channel and Bending reports are from Richest Families & Billionaires of Australia (Aussie Fortunes). Delete it whenever you like.",
+  "category": "Business & Careers",
+  "addedAt": "2026-10-28T23:20:00Z",
+  "updatedAt": "2026-10-28T23:20:00Z",
+  "tubelab": {
+   "title": "Cosmic \"What If\" Scenarios",
+   "channelsAnalyzed": 5,
+   "videosAnalyzed": 191,
+   "marketSize": 100,
+   "unsaturated": 100,
+   "profitable": 46,
+   "viralViews": "16M",
+   "loyalAudience": "202.9K",
+   "reachBeyondSubs": "7",
+   "loyalSubs": "82%",
+   "rpmLow": 3.2,
+   "rpmHigh": 4.7,
+   "avgViews": "202.9K",
+   "revenue": {
+    "k1": "$3.2 to $4.7",
+    "k10": "$32 to $47",
+    "k100": "$320 to $470",
+    "m1": "$3.2K to $4.7K"
+   },
+   "notes": {
+    "marketSize": "A viral video could reach 16M views, a top-performing video around 3.3M views and a good video 202.9K views.",
+    "unsaturated": "Looks like you found an unsaturated niche.",
+    "profitable": "Low revenue per thousand views, showing poor profit potential. Given the low saturation, this seems like a solid niche."
+   }
+  },
+  "niche": {
+   "title": "Richest Families & Billionaires of Australia",
+   "searchTerm": "richest families in Australia",
+   "opportunity": 64,
+   "verdict": "Promising",
+   "demand": 60,
+   "room": 66,
+   "revenue": 66,
+   "rpm": "$6 \u2013 $13",
+   "summary": "Worth entering as a small test: Australia-specific videos from tiny channels are reaching 100k+ views, so competition is beatable. Build around fact-checked family and billionaire profiles and city/community ownership videos with sourced numbers, and publish several to see which angle holds."
+  },
+  "channel": {
+   "name": "Aussie Fortunes",
+   "handle": "@aussiefortunes",
+   "potential": 66,
+   "verdict": "Promising"
+  },
+  "bending": {
+   "bestScore": 82,
+   "bestBend": "Empire Rise (timeline)",
+   "bends": 13
+  },
+  "screenshots": [
+   {
+    
+    "url": "screenshots/test-scores.png",
+    "caption": "Market Size, Unsaturated and Profitable scores"
+   },
+   {
+    
+    "url": "screenshots/test-revenue.png",
+    "caption": "Revenue estimations"
+   },
+   {
+    
+    "url": "screenshots/test-outliers.png",
+    "caption": "Outlier videos"
+   }
+  ],
+  "reports": {
+   "niche": "reports/test-niche.html",
+   "channel": "reports/test-channel.html",
+   "bending": "reports/test-bending.html"
+  },
+  "_id": "test-cosmic-what-if-aussie-fortunes"
+ }
+]
+</script>
+<script>
+(function () {
+  "use strict";
+  var out = document.getElementById("out");
+  var q = document.getElementById("q");
+  var sortSel = document.getElementById("sort");
+  var filterSel = document.getElementById("filter");
+  var niches = [];
+  var canWrite = false;
+  var dbRef = null, assetsRef = null;
+  var confirming = null;
+  var loaded = false;
+
+  try {
+    var saved = JSON.parse(localStorage.getItem("nicheAnalyzerView") || "{}");
+    if (saved.sort) sortSel.value = saved.sort;
+    if (saved.filter) filterSel.value = saved.filter;
+  } catch (e) {}
+  function remember() {
+    try { localStorage.setItem("nicheAnalyzerView", JSON.stringify({ sort: sortSel.value, filter: filterSel.value })); } catch (e) {}
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+  function band(v) { return !isNum(v) ? "none" : v >= 71 ? "good" : v >= 50 ? "warn" : "bad"; }
+  function bandColor(v) { return "var(--" + (band(v) === "none" ? "muted" : band(v)) + ")"; }
+  function g(o, path) {
+    return path.split(".").reduce(function (a, k) { return a && a[k] != null ? a[k] : undefined; }, o);
+  }
+  function money(lo, hi) {
+    if (!isNum(lo) && !isNum(hi)) return "—";
+    return "$" + lo + (isNum(hi) ? " – $" + hi : "");
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  function shotSrc(s) { return s.id ? "/_blob/" + s.id : (s.url || ""); }
+  function safeUrl(u) { return typeof u === "string" && (/^https:\/\//.test(u) || /^reports\/[A-Za-z0-9_-]+\.html$/.test(u)) ? u : ""; }
+
+  function gauge(label, v, sub) {
+    var r = 28, c = 2 * Math.PI * r, frac = isNum(v) ? Math.max(0, Math.min(100, v)) / 100 : 0;
+    return '<div class="gauge ' + band(v) + '">' +
+      '<svg viewBox="0 0 68 68" aria-hidden="true"><circle class="track" cx="34" cy="34" r="' + r + '"></circle>' +
+      '<circle class="val" cx="34" cy="34" r="' + r + '" stroke-dasharray="' + (c * frac).toFixed(1) + ' ' + c.toFixed(1) + '"></circle>' +
+      '<text x="34" y="34" text-anchor="middle" dominant-baseline="central">' + (isNum(v) ? v : "—") + '</text></svg>' +
+      '<b>' + esc(label) + '</b>' + (sub ? '<small>' + sub + '</small>' : "") + '</div>';
+  }
+  function barRow(label, v) {
+    return '<div class="bar-row"><span>' + esc(label) + '</span><span class="meter"><i style="width:' +
+      (isNum(v) ? v : 0) + '%;background:' + bandColor(v) + '"></i></span><span class="num">' + (isNum(v) ? v : "—") + '</span></div>';
+  }
+  function verdictPill(v, score) {
+    if (!v) return "";
+    return '<span class="pill ' + band(score) + '">' + esc(v) + '</span>';
+  }
+  function fact(label, val) {
+    return '<div><dt>' + esc(label) + '</dt><dd>' + esc(val == null || val === "" ? "—" : val) + '</dd></div>';
+  }
+  function reportBtn(label, url) {
+    var u = safeUrl(url);
+    if (!u) return '<span class="rbtn off" aria-disabled="true">' + label + '<small>Not added</small></span>';
+    return '<a class="rbtn" href="' + esc(u) + '" target="_blank" rel="noopener">' + label + '<small>Open report ↗</small></a>';
+  }
+
+  function card(n) {
+    var t = n.tubelab || {}, ni = n.niche || {}, ch = n.channel || {}, be = n.bending || {};
+    var shots = Array.isArray(n.screenshots) ? n.screenshots : [];
+    var rpm = isNum(t.rpmLow) ? money(t.rpmLow, t.rpmHigh) : "—";
+    var h = '<article class="card" data-id="' + esc(n._id) + '">';
+    h += '<div class="card-head"><h2>' + esc(n.name || "Untitled niche") + '</h2><div class="meta">';
+    if (n.isTest) h += '<span class="pill test">Test entry</span>';
+    h += verdictPill(ni.verdict, ni.opportunity);
+    if (n.category) h += '<span>' + esc(n.category) + '</span>';
+    if (n.addedAt) h += '<span>Added ' + esc(fmtDate(n.addedAt)) + '</span>';
+    h += '</div>';
+    if (n.isTest && n.testNote) h += '<div class="testnote">' + esc(n.testNote) + '</div>';
+    h += '</div>';
+
+    // TubeLab
+    h += '<section class="sec"><div class="sec-label"><span>TubeLab' + (t.title ? ' · ' + esc(t.title) : '') + '</span>' +
+      (isNum(t.videosAnalyzed) ? '<span class="num">' + t.channelsAnalyzed + ' ch · ' + t.videosAnalyzed + ' videos</span>' : '') + '</div>';
+    h += '<div class="gauges">' +
+      gauge("Market Size", t.marketSize, t.viralViews ? "Viral " + esc(t.viralViews) : "") +
+      gauge("Unsaturated", t.unsaturated, t.loyalSubs ? "Loyal subs " + esc(t.loyalSubs) : "") +
+      gauge("Profitable", t.profitable, rpm !== "—" ? "RPM " + esc(rpm) : "") + '</div>';
+    h += '<div class="bands"><span><i style="background:var(--bad)"></i>0–49</span><span><i style="background:var(--warn)"></i>50–70</span><span><i style="background:var(--good)"></i>71–100</span></div>';
+    h += '<dl class="facts">' +
+      fact("RPM estimate", rpm) +
+      fact("Avg. views", t.avgViews) +
+      fact("Loyal audience", t.loyalAudience) +
+      fact("Reach beyond subs", t.reachBeyondSubs) +
+      fact("Per 100K views", g(t, "revenue.k100")) +
+      fact("Per 1M views", g(t, "revenue.m1")) + '</dl></section>';
+
+    // Audit reports
+    h += '<section class="sec"><div class="sec-label"><span>Niche Analyzer audit</span>' + (ni.rpm ? '<span class="num">RPM ' + esc(ni.rpm) + '</span>' : '') + '</div>';
+    h += '<div class="audit"><div class="big"><span class="score" style="color:' + bandColor(ni.opportunity) + '">' + (isNum(ni.opportunity) ? ni.opportunity : "—") + '</span><small>Opportunity</small></div>' +
+      '<div class="bars">' + barRow("Demand", ni.demand) + barRow("Room to compete", ni.room) + barRow("Revenue potential", ni.revenue) + '</div></div>';
+    h += '<div class="sub-scores">' +
+      '<div class="mini"><small>Channel potential</small><b style="color:' + bandColor(ch.potential) + '">' + (isNum(ch.potential) ? ch.potential : "—") + '</b><span>' + esc(ch.name || "No channel report") + (ch.verdict ? " · " + esc(ch.verdict) : "") + '</span></div>' +
+      '<div class="mini"><small>Best niche bend</small><b style="color:' + bandColor(be.bestScore) + '">' + (isNum(be.bestScore) ? be.bestScore : "—") + '</b><span>' + esc(be.bestBend || "No bending report") + (isNum(be.bends) ? " · " + be.bends + " bends scored" : "") + '</span></div>' +
+      '</div>';
+    if (ni.summary) h += '<p class="summary">' + esc(ni.summary) + '</p>';
+    h += '</section>';
+
+    // Screenshots
+    h += '<section class="sec"><div class="sec-label"><span>TubeLab screenshots</span><span>Tap to enlarge</span></div>';
+    if (shots.length) {
+      h += '<div class="shots">' + shots.map(function (s, i) {
+        return '<button class="shot" type="button" data-shot="' + i + '" aria-label="Enlarge ' + esc(s.caption || "screenshot " + (i + 1)) + '"><img src="' + esc(shotSrc(s)) + '" alt="' + esc(s.caption || "") + '" loading="lazy"></button>';
+      }).join("") + '</div>';
+    } else h += '<p class="noshots">No screenshots added yet.</p>';
+    h += '</section>';
+
+    // Reports
+    var rp = n.reports || {};
+    h += '<section class="sec"><div class="sec-label"><span>Audit reports</span></div><div class="reports">' +
+      reportBtn("Niche", rp.niche) + reportBtn("Channel", rp.channel) + reportBtn("Bending", rp.bending) + '</div></section>';
+
+    // Footer
+    h += '<div class="card-foot">';
+    if (confirming === n._id) {
+      h += '<div class="confirm"><span>Delete this niche and its screenshots? This can’t be undone.</span>' +
+        '<button class="ghost danger" type="button" data-act="del-yes">Delete</button><button class="ghost" type="button" data-act="del-no">Cancel</button></div>';
+    } else {
+      h += '<span>' + (n.updatedAt ? 'Updated ' + esc(fmtDate(n.updatedAt)) : '') + '</span>';
+      if (canWrite) h += '<button class="ghost" type="button" data-act="del">Delete niche</button>';
+    }
+    h += '</div></article>';
+    return h;
+  }
+
+  var sorters = {
+    added: function (n) { return n.addedAt || ""; },
+    opportunity: function (n) { return g(n, "niche.opportunity"); },
+    marketSize: function (n) { return g(n, "tubelab.marketSize"); },
+    unsaturated: function (n) { return g(n, "tubelab.unsaturated"); },
+    profitable: function (n) { return g(n, "tubelab.profitable"); },
+    rpm: function (n) { return g(n, "tubelab.rpmHigh"); },
+    channel: function (n) { return g(n, "channel.potential"); },
+    bend: function (n) { return g(n, "bending.bestScore"); }
+  };
+  var filters = {
+    all: function () { return true; },
+    green3: function (n) { return ["marketSize", "unsaturated", "profitable"].every(function (k) { return g(n, "tubelab." + k) >= 71; }); },
+    profit71: function (n) { return g(n, "tubelab.profitable") >= 71; },
+    unsat71: function (n) { return g(n, "tubelab.unsaturated") >= 71; },
+    market71: function (n) { return g(n, "tubelab.marketSize") >= 71; },
+    opp60: function (n) { return g(n, "niche.opportunity") >= 60; },
+    real: function (n) { return !n.isTest; }
+  };
+
+  function visible() {
+    var term = q.value.trim().toLowerCase();
+    var list = niches.filter(filters[filterSel.value] || filters.all).filter(function (n) {
+      if (!term) return true;
+      return [n.name, n.category, g(n, "channel.name"), g(n, "tubelab.title")].join(" ").toLowerCase().indexOf(term) !== -1;
+    });
+    var key = sortSel.value;
+    if (key === "name") list.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    else {
+      var f = sorters[key] || sorters.added;
+      list.sort(function (a, b) {
+        var x = f(a), y = f(b);
+        if (x == null && y == null) return 0;
+        if (x == null) return 1;
+        if (y == null) return -1;
+        return x < y ? 1 : x > y ? -1 : 0;
+      });
+    }
+    return list;
+  }
+
+  function render() {
+    var tally = document.getElementById("tally");
+    tally.hidden = !loaded || !niches.length;
+    document.getElementById("t-count").textContent = niches.filter(filters.real).length;
+    document.getElementById("t-green").textContent = niches.filter(function (n) { return !n.isTest && filters.green3(n); }).length;
+    if (!loaded) return;
+    if (!niches.length) {
+      out.innerHTML = '<div class="state"><h2>No niches yet</h2><p>To add one, send these in your Claude channel and Claude builds the card for you:</p>' +
+        '<ol><li>The niche name</li><li>The 3 TubeLab screenshots</li><li>The Niche, Channel and Bending audit reports</li></ol></div>';
+      return;
+    }
+    var list = visible();
+    if (!list.length) {
+      out.innerHTML = '<div class="state"><h2>No niches match</h2><p>Try a different search or set Show to All niches.</p></div>';
+      return;
+    }
+    out.innerHTML = '<div class="grid">' + list.map(card).join("") + '</div>';
+  }
+
+  [q, sortSel, filterSel].forEach(function (el) {
+    el.addEventListener("input", function () { remember(); render(); });
+  });
+
+  // Lightbox
+  var lb = document.getElementById("lb"), lbImg = document.getElementById("lb-img"), lbCap = document.getElementById("lb-cap");
+  var lbShots = [], lbIdx = 0, lbReturn = null;
+  function showShot() {
+    var s = lbShots[lbIdx];
+    lbImg.src = shotSrc(s);
+    lbImg.alt = s.caption || "";
+    lbCap.textContent = (s.caption || "Screenshot") + "  ·  " + (lbIdx + 1) + " of " + lbShots.length;
+    document.getElementById("lb-prev").hidden = document.getElementById("lb-next").hidden = lbShots.length < 2;
+  }
+  function openLb(n, i, from) {
+    lbShots = n.screenshots || []; lbIdx = i; lbReturn = from;
+    showShot(); lb.hidden = false; document.getElementById("lb-close").focus();
+  }
+  function closeLb() { lb.hidden = true; lbImg.removeAttribute("src"); if (lbReturn) lbReturn.focus(); }
+  function step(d) { lbIdx = (lbIdx + d + lbShots.length) % lbShots.length; showShot(); }
+  document.getElementById("lb-close").onclick = closeLb;
+  document.getElementById("lb-prev").onclick = function () { step(-1); };
+  document.getElementById("lb-next").onclick = function () { step(1); };
+  lb.addEventListener("click", function (e) { if (e.target === lb || e.target.classList.contains("lb-stage")) closeLb(); });
+  document.addEventListener("keydown", function (e) {
+    if (lb.hidden) return;
+    if (e.key === "Escape") closeLb();
+    else if (e.key === "ArrowLeft") step(-1);
+    else if (e.key === "ArrowRight") step(1);
+  });
+
+  out.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-shot], [data-act]");
+    if (!el) return;
+    var cardEl = el.closest(".card");
+    var n = niches.filter(function (x) { return x._id === cardEl.dataset.id; })[0];
+    if (!n) return;
+    if (el.dataset.shot != null) { openLb(n, +el.dataset.shot, el); return; }
+    var act = el.dataset.act;
+    if (act === "del") { confirming = n._id; render(); }
+    else if (act === "del-no") { confirming = null; render(); }
+    else if (act === "del-yes") { removeNiche(n); }
+  });
+
+  function removeNiche(n) {
+    if (!dbRef) return;
+    dbRef.doc("niches/" + n._id).delete().then(function () {
+      confirming = null;
+      (n.screenshots || []).forEach(function (s) {
+        if (s.id && assetsRef) assetsRef.delete(s.id).catch(function () {});
+      });
+    }).catch(function (err) {
+      confirming = null; render();
+      var c = out.querySelector('[data-id="' + n._id + '"] .card-foot');
+      if (c) c.insertAdjacentHTML("afterbegin", '<span style="color:var(--bad)">Couldn’t delete: ' + esc(err && err.message || "the store refused the change") + '</span>');
+    });
+  }
+
+  // Data: niches live in the page itself, in the niche-data block below.
+  try {
+    niches = JSON.parse(document.getElementById("niche-data").textContent || "[]");
+  } catch (e) { niches = []; }
+  loaded = true;
+  render();
+})();
+</script>
+
+
+</body>
+</html>
