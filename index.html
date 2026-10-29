@@ -179,6 +179,8 @@ button, input, select { font: inherit; color: inherit; }
 .state p { margin: 0; color: var(--muted); }
 .state ol { margin: 0; padding-left: 1.2em; color: var(--muted); display: grid; gap: 4px; }
 
+[hidden] { display: none !important; }
+
 /* Lightbox */
 .lb { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; grid-template-rows: auto 1fr auto; padding: calc(env(safe-area-inset-top, 0px) + 10px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
 .lb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #fff; }
